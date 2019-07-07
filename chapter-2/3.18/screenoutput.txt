@@ -1,0 +1,22 @@
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/OS_Concept_Labs/chapter-2/3.18$ make
+gcc -o zombie.o zombie.c
+
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ ps aux  | grep zombie
+shenma   20526  0.0  0.0   4508   640 pts/0    S+   23:34   0:00 ./zombie
+shenma   20527  0.0  0.0      0     0 pts/0    Z+   23:34   0:00 [zombie] <defunct>
+shenma   20533  0.0  0.1  21536  1060 pts/1    S+   23:34   0:00 grep --color=auto zombie
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ ps aux  | grep zombie
+shenma   20526  0.0  0.0   4508   640 pts/0    S+   23:34   0:00 ./zombie
+shenma   20527  0.0  0.0      0     0 pts/0    Z+   23:34   0:00 [zombie] <defunct>
+shenma   20535  0.0  0.0  21536  1000 pts/1    S+   23:34   0:00 grep --color=auto zombie
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ 
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ 
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ 
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ ps aux  | grep zombie
+shenma   20526  0.0  0.0   4508   640 pts/0    S+   23:34   0:00 ./zombie
+shenma   20527  0.0  0.0      0     0 pts/0    Z+   23:34   0:00 [zombie] <defunct>
+shenma   20537  0.0  0.1  21536  1036 pts/1    S+   23:34   0:00 grep --color=auto zombie
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ ps aux  | grep zombie
+shenma   20540  0.0  0.0  21536   980 pts/1    S+   23:34   0:00 grep --color=auto zombie
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/chapter-1$ 
+
