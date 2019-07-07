@@ -1,5 +1,5 @@
 
-obj-m := simple.o
+obj-m := simple.o filesystem.o
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 default:
