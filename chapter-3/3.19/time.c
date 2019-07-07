@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+/*
+ * shared memory version
+ */
 int main(int argc, char *argv[]) {
 	struct timeval start;
 	struct timeval end;
