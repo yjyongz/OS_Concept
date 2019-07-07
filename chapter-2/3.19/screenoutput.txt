@@ -1,0 +1,5 @@
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/OS_Concept_Labs/chapter-2/3.19$ ./time ls
+Makefile  time	time.c
+times taken for ./time: second:0 microsecond:834
+shenma@shenma-VirtualBox:/nobackup/shenma/OS/OS_Concept_Labs/chapter-2/3.19$ 
+
