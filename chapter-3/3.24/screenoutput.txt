@@ -1,0 +1,14 @@
+mvn archetype:generate -DgroupId=com.os.haiku -DartifactId=haiku -DarchetypeArtifactId
+=maven-archetype-quickstart -DarchetypeVersion=1.4 -DinteractiveMode=false
+
+
+22:25:27 shenma$java DataServer
+
+
+
+DataClient.class  DataServer.class
+22:25:49 shenma$java DataClient
+An ocean voyage
+As waves break over the bow,
+the sea welcomes me
+
