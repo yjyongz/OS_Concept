@@ -1,0 +1,22 @@
+23:42:58 shenma$java DataServer 
+
+
+
+Hello World
+main courses
+
+
+
+23:43:13 shenma$java DataClient 
+
+echo: 
+
+echo: 
+
+echo: 
+Hello World
+echo: Hello World
+main courses 
+echo: main courses
+
+
