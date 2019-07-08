@@ -1,3 +1,5 @@
+maven compile
+
 .
 ├── pom.xml
 ├── screenoutput.txt
