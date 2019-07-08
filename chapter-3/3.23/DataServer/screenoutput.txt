@@ -1,0 +1,31 @@
+.
+├── pom.xml
+├── screenoutput.txt
+└── src
+    ├── main
+    │   └── java
+    │       └── com
+    │           └── os
+    │               └── dataserver
+    │                   ├── DataClient.java
+    │                   └── DataServer.java
+    └── test
+        └── java
+            └── com
+                └── os
+                    └── dataserver
+                        └── AppTest.java
+
+11 directories, 5 files
+
+
+:54:08 shenma$java DataClient
+Do More of what makes you happy
+18:54:25 shenma$java DataClient
+Forgive everything, you will be happier
+18:54:27 shenma$java DataClient
+Do More of what makes you happy
+18:54:29 shenma$java DataClient
+Love everything, you will be happiest
+18:54:30 shenma$
+
