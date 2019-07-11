@@ -4,18 +4,19 @@
 #include <sys/queue.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define MAX_LINE 80 /* The maximum length command */
 int should_run = 1;
 void handler(int sig) {
 	should_run = 0;	
 }
-
 const int length = MAX_LINE * 2;
 
 void assign_args(char **args[length], int t, char buffer[64][64], int index) {
 	args[index] = calloc(1, sizeof(char**)*(t+1)); 
-	for (int idx=0; idx < t; idx++) {
+    int idx = 0;
+	for (idx=0; idx < t; idx++) {
 		int len = strlen(buffer[idx]);
 		args[index][idx] = calloc(1, sizeof(char) * len);
 		strncpy(args[index][idx], buffer[idx], len);
@@ -25,7 +26,7 @@ void assign_args(char **args[length], int t, char buffer[64][64], int index) {
 void string_parse(char *strs, int *ncommands, char **args[length])
 {
 	const char *DELIM = "\t\r\n\a ";
-	int index = 0, t = 0;
+	int index = 0, t = 0, idx = 0, jdx = 0;
 	char buffer[64][64] = {0};
 	char *token = strtok(strs, DELIM);
 	while (token != NULL) {
@@ -44,50 +45,78 @@ void string_parse(char *strs, int *ncommands, char **args[length])
 	assign_args(args, t, buffer, index);
 	index+=1;
 	*ncommands = index; 
-	for (int idx = 0; idx < index; idx++) {
-		for (int jdx=0; args[idx][jdx] != NULL; jdx++) {
+    /*
+	for (idx = 0; idx < index; idx++) {
+		for (jdx=0; args[idx][jdx] != NULL; jdx++) {
 			printf("%s ", args[idx][jdx]);
 		}
 		printf("\n");
 	}
+    */
 }
 
-void execute(int ncommands, char **args[length], int index = 0) {
+void execute(int ncommands, char **args[length], int index, int *pfd) {
 
 	if (ncommands == index) return;
-
+    int fd[2], status = 0, childpid;
+    if (pipe(fd) == -1) {
+        exit(errno);
+    }
 	pid_t pid = fork();
 	switch(pid) {
-		case 0:
-			//child
-			break
 		case -1:
 			break;
+		case 0:
+            if (pfd != NULL) {
+                dup2(pfd[0], STDIN_FILENO);
+                close(pfd[0]);
+                close(pfd[1]);
+            }
+            if (index + 1 != ncommands) {
+                dup2(fd[1], STDOUT_FILENO);
+            }
+            close(fd[0]);
+            close(fd[1]);
+            execvp(args[index][0], args[index]);
 		default:
-			int childpid = waitpid(pid, status, 0);
-			//parent
+            if (pfd) {
+                close(pfd[0]);
+                close(pfd[1]);
+            }
+			childpid = waitpid(pid, status, 0);
+            execute(ncommands, args, index+1, fd);
+            close(fd[0]);
+            close(fd[1]);
 	}
 }
+
 int main(void)
 {
 	signal(SIGINT, handler);
-	char **args[length];
-	/* e.g: ls -l | less
+	/* 
+     * e.g: ls -l | less
      * args[0][0] = ls
-	 * args[0][1] = -l
-	 * args[0][2] = NULL
+     * args[0][1] = -l
+     * args[0][2] = NULL
      *
      * args[1][0] = less
      * args[1][1] = NULL
 	 */
+	char **args[length];
 	while (should_run) {
+        int ncommands = 0;
 		char strs[MAX_LINE] = {0};
 		memset(args, 0, sizeof(args));
 		printf("osh#");
 		fgets(strs, length, stdin);
-		int ncommands = 0;
+        if (strs[0] == '\n') continue;
+        if (strlen(strs) == 3 && 
+            strs[0] == '!' && strs[1] == '1' && strs[2] == '\n') {
+		    printf("osh#");
+            //getHistory(strs);
+        }
 		string_parse(strs, &ncommands, args);
-		execute(ncommands, args);
+		execute(ncommands, args, 0, NULL);
 	}
 	return 0;
 }
