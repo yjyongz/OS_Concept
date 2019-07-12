@@ -57,6 +57,7 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
     int t = 0, i_append = false, o_append = false;
     while (args[index][t] != NULL) {
         char *token = args[index][t];
+        //printf("token : %lu %s",  strlen(token), token);
         if (*in_to_file == true && *ifile == NULL) {
             *ifile = (int*)calloc(1, sizeof(int));
             **ifile = open(token, O_RDONLY);
@@ -192,7 +193,7 @@ int main(void)
         if (strlen(strs) == 3 && 
             strs[0] == '!' && strs[1] == '!' && strs[2] == '\n') {
             printf("osh#");
-            if (getHistory(strs))
+            //if (getHistory(strs))
         }
         string_parse(strs, &ncommands, args);
         execute(ncommands, args, 0, NULL, NULL, NULL, NULL);
