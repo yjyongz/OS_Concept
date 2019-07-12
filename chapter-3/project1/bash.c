@@ -8,14 +8,36 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <sys/wait.h>
+#include <errno.h>
 
 #define MAX_LINE 80 /* The maximum length command */
 int should_run = 1;
 void handler(int sig) {
     should_run = 0;	
 }
+#define HLENGTH 256
+char *hist[HLENGTH] = {0};
+int cur = 0;
 const int length = MAX_LINE * 2;
 
+void addHistory(char *strs) {
+    if (hist[cur] != NULL) {
+        free(hist[cur]);
+        hist[cur] = NULL;
+    }
+
+    hist[cur] = strndup(strs, strlen(strs));
+    cur = (cur + 1) % HLENGTH;
+    return;
+}
+
+char* getHistory() {
+    char *t = hist[(cur-1)%HLENGTH];  
+    if (hist[(cur-1)%HLENGTH] == NULL) {
+        return NULL;
+    } 
+    return t;
+}
 void assign_args(char **args[length], int t, char buffer[64][64], int index) {
     args[index] = calloc(1, sizeof(char**)*(t+1)); 
     int idx = 0;
@@ -87,21 +109,23 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
             args[index][t] = NULL;
         }
         if (*token == '<' || *token == '>' || 
-            (strlen(token) == 3 && token[0] == '2' && token[1] == '>' && token[2] == '\n')) {
+            (strlen(token) == 2 && token[0] == '2' && token[1] == '>')) {
             *in_to_file = *token == '<';
             *out_to_file = *token == '>';
             i_append = strlen(token) == 2 && token[1] == '<';
-            o_append = strlen(token) == 2 && token[1] == '>';
+            o_append = strlen(token) == 2 && token[0] =='>' && token[1] == '>';
             *eout_to_file = (strlen(token) == 2 && token[0] == '2' && token[1] == '>'); 
+            o_append = o_append | (*eout_to_file && 
+                    (strlen(token) == 3 && token[0] == '2' && token[1] == '>' && token[2] == '>'));   
             free(args[index][t]);
             args[index][t] = NULL;
         }
-        if (strlen(token) == 5 && strncmp(token, "2>&1\n", 5) == 0) {
+        if (strlen(token) == 4 && strncmp(token, "2>&1", 4) == 0) {
             *out_combine = true;
             free(args[index][t]);
             args[index][t] = NULL;
         }
-        if (strlen(token) == 5 && strncmp(token, "1>&2\n", 5) == 0) {
+        if (strlen(token) == 4 && strncmp(token, "1>&2", 4) == 0) {
             *err_combine = true;
             free(args[index][t]);
             args[index][t] = NULL;
@@ -114,7 +138,8 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
              int *ofile, int *ifile, int *efile) {
     if (ncommands == index) return;
     int fd[2], status = 0, childpid, file;
-    int out_to_file = false, in_to_file = false, eout_to_file = false, out_combine = false, err_combine = false;
+    int out_to_file = false, in_to_file = false, eout_to_file = false;
+    int out_combine = false, err_combine = false;
     if (pipe(fd) == -1) {
         exit(errno);
     }
@@ -130,7 +155,7 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
             }
             if (pfd != NULL) {
                 if (ifile == NULL) {
-                    while((dup2(*ifile, STDIN_FILENO) == -1) && errno == EINTR) {}
+                    while((dup2(pfd[0], STDIN_FILENO) == -1) && errno == EINTR) {}
                 }
                 close(pfd[0]);
                 close(pfd[1]);
@@ -145,9 +170,18 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
             } if (index + 1 != ncommands) {
                 while((dup2(fd[1], STDOUT_FILENO) == -1) && errno == EINTR) {}
             }
+            if (out_combine) {
+                close(STDERR_FILENO);
+            }
+            if (err_combine) {
+                close(STDOUT_FILENO);
+            }
             close(fd[0]);
             close(fd[1]);
-            execvp(args[index][0], args[index]);
+            if (execvp(args[index][0], args[index]) == -1) {
+                perror(strerror(errno));
+                exit(errno);
+            }
         default:
             if (pfd) {
                 close(pfd[0]);
@@ -192,9 +226,16 @@ int main(void)
         if (strs[0] == '\n') continue;
         if (strlen(strs) == 3 && 
             strs[0] == '!' && strs[1] == '!' && strs[2] == '\n') {
-            printf("osh#");
-            //if (getHistory(strs))
+            char *t = getHistory();
+            if (t == NULL) {
+                printf("No History available\n");
+                continue;
+            } else {
+                printf("%s", t);
+                strncpy(strs, t, strlen(t));
+            }
         }
+        addHistory(strs);
         string_parse(strs, &ncommands, args);
         execute(ncommands, args, 0, NULL, NULL, NULL, NULL);
     }
