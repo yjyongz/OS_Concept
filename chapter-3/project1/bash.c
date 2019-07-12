@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
 
 #define MAX_LINE 80 /* The maximum length command */
 int should_run = 1;
@@ -45,34 +47,51 @@ void string_parse(char *strs, int *ncommands, char **args[length])
     assign_args(args, t, buffer, index);
     index+=1;
     *ncommands = index; 
-    /*
     for (idx = 0; idx < index; idx++) {
         for (jdx=0; args[idx][jdx] != NULL; jdx++) {
             printf("%s ", args[idx][jdx]);
         }
         printf("\n");
     }
-    */
 }
 
-void execute(int ncommands, char **args[length], int index, int *pfd) {
+void execute(int ncommands, char **args[length], int index, int *pfd, 
+             int *ofile, int *ifile) {
 
     if (ncommands == index) return;
-    int fd[2], status = 0, childpid;
+    int fd[2], status = 0, childpid, file;
+    int out_to_file = false, in_to_file = false;
     if (pipe(fd) == -1) {
         exit(errno);
+    }
+    if (index + 2 < ncommands) {
+        out_to_file = args[index+1][0][0] == '>';
+        in_to_file = args[index+1][0][0] == '<';
+    }
+    if (in_to_file && ifile == NULL) {
+        *ifile = open(args[index+2][0], O_CREAT | O_WRONLY);
+    }
+    if (out_to_file && ofile == NULL) {
+        *ofile = open(args[index+2][0], O_CREAT | O_WRONLY);
     }
     pid_t pid = fork();
     switch(pid) {
         case -1:
             break;
         case 0:
+            if (ifile != NULL) {
+                dup2(*ifile, STDIN_FILENO);
+            }
             if (pfd != NULL) {
-                dup2(pfd[0], STDIN_FILENO);
+                if (ifile == NULL) {
+                    dup2(pfd[0], STDIN_FILENO);
+                }
                 close(pfd[0]);
                 close(pfd[1]);
             }
-            if (index + 1 != ncommands) {
+            if (ofile != NULL) {
+                dup2(*ofile, STDOUT_FILENO);
+            } else {
                 dup2(fd[1], STDOUT_FILENO);
             }
             close(fd[0]);
@@ -84,7 +103,15 @@ void execute(int ncommands, char **args[length], int index, int *pfd) {
                 close(pfd[1]);
             }
             childpid = waitpid(pid, &status, 0);
-            execute(ncommands, args, index+1, fd);
+            if (ifile) {
+                close(*ifile);
+                ifile = NULL;
+            }
+            if (ofile) {
+                close(*ofile);
+                ofile = NULL;
+            }
+            execute(ncommands, args, index+1, fd, ofile, ifile);
             close(fd[0]);
             close(fd[1]);
     }
@@ -111,12 +138,12 @@ int main(void)
         fgets(strs, length, stdin);
         if (strs[0] == '\n') continue;
         if (strlen(strs) == 3 && 
-            strs[0] == '!' && strs[1] == '1' && strs[2] == '\n') {
+            strs[0] == '!' && strs[1] == '!' && strs[2] == '\n') {
             printf("osh#");
             //getHistory(strs);
         }
         string_parse(strs, &ncommands, args);
-        execute(ncommands, args, 0, NULL);
+        execute(ncommands, args, 0, NULL, NULL, NULL);
     }
     return 0;
 }
