@@ -11,8 +11,8 @@
 #include <errno.h>
 
 #define MAX_LINE 80 /* The maximum length command */
-int should_run = 1;
 #define HLENGTH 256
+int should_run = 1;
 char *hist[HLENGTH] = {0};
 int cur = 0;
 const int length = MAX_LINE * 2;
@@ -94,13 +94,15 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
     int t = 0, i_append = false, o_append = false;
     while (args[index][t] != NULL) {
         char *token = args[index][t];
-        if (t == 0 && strncmp(token, "cd") == 0) {
+        if (t == 0 && strncmp(token, "cd", 2) == 0) {
+            *internal_command = 1;
+        }
+        if (t == 0 && strncmp(token, "fg", 2) == 0) {
             *internal_command = 1;
         }
         if (strlen(token) == 1 && token[0] == '&') {
             *back_ground = true;
         }
-        //printf("token : %lu %s",  strlen(token), token);
         if (*in_to_file == true && *ifile == NULL) {
             *ifile = (int*)calloc(1, sizeof(int));
             **ifile = open(token, O_RDONLY);
@@ -153,6 +155,15 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
         }
         t++;
     }
+}
+
+void execute_internal(int ncommands, char **args[length], int index) {
+    if (strncmp(args[index][0], "cd", 2) == 0) {
+        chdir(args[index][1]);
+    }
+    if (strncmp(args[index][0], "fg", 2) == 0) {
+    }
+    return;
 }
 
 void execute(int ncommands, char **args[length], int index, int *pfd, 
@@ -247,7 +258,6 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
 
 void free_args(char **args[length], int ncommands) {
     int index = 0, jdx = 0;
-    //printf("freeing %d\n", ncommands);
     for (index = 0; index < ncommands; index++) {
         for(jdx = 0; args[index][jdx] != NULL; jdx++) {
             free(args[index][jdx]);
