@@ -12,13 +12,27 @@
 
 #define MAX_LINE 80 /* The maximum length command */
 int should_run = 1;
-void handler(int sig) {
-    should_run = 0;	
-}
 #define HLENGTH 256
 char *hist[HLENGTH] = {0};
 int cur = 0;
 const int length = MAX_LINE * 2;
+pid_t parent_pid = 0;
+
+void term_handler(int sig) {
+    if (getpid() != parent_pid) {
+        exit(0);
+    }
+}
+
+void ctrl_c_handler(int sig) {
+    int status = 0;
+    if (getpid() == parent_pid) {
+        kill(-parent_pid, SIGTERM);
+        int cpid = waitpid(parent_pid, &status, WNOHANG);
+    } else {
+        exit(0);
+    }
+}
 
 void addHistory(char *strs) {
     if (hist[cur] != NULL) {
@@ -38,12 +52,12 @@ char* getHistory() {
     } 
     return t;
 }
-void assign_args(char **args[length], int t, char buffer[64][64], int index) {
+void assign_args(char **args[length], int t, char buffer[64][256], int index) {
     args[index] = calloc(1, sizeof(char**)*(t+1)); 
     int idx = 0;
     for (idx=0; idx < t; idx++) {
         int len = strlen(buffer[idx]);
-        args[index][idx] = calloc(1, sizeof(char) * len);
+        args[index][idx] = calloc(1, sizeof(char) * (len+1));
         strncpy(args[index][idx], buffer[idx], len);
     }
 }
@@ -52,7 +66,7 @@ void string_parse(char *strs, int *ncommands, char **args[length])
 {
     const char *DELIM = "\t\r\n\a ";
     int index = 0, t = 0, idx = 0, jdx = 0;
-    char buffer[64][64] = {{0}};
+    char buffer[64][256] = {{0}};
     char *token = strtok(strs, DELIM);
     while (token != NULL) {
         if (*token != '|') {
@@ -75,16 +89,23 @@ void string_parse(char *strs, int *ncommands, char **args[length])
 void parse_sub_command(char **args[length], int index, int *out_to_file, 
                        int *in_to_file, int *eout_to_file, 
                        int **ifile, int **ofile, int **efile, 
-                       int *out_combine, int *err_combine) {
+                       int *out_combine, int *err_combine, 
+                       int *back_ground, int *internal_command) {
     int t = 0, i_append = false, o_append = false;
     while (args[index][t] != NULL) {
         char *token = args[index][t];
+        if (t == 0 && strncmp(token, "cd") == 0) {
+            *internal_command = 1;
+        }
+        if (strlen(token) == 1 && token[0] == '&') {
+            *back_ground = true;
+        }
         //printf("token : %lu %s",  strlen(token), token);
         if (*in_to_file == true && *ifile == NULL) {
             *ifile = (int*)calloc(1, sizeof(int));
             **ifile = open(token, O_RDONLY);
             free(args[index][t]);
-            args[index][t] = NULL;
+            token = args[index][t] = NULL;
         }
         if (*out_to_file == true && *ofile == NULL) {
             *ofile = (int*)calloc(1, sizeof(int));
@@ -95,7 +116,7 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
             }
             o_append= false;
             free(args[index][t]);
-            args[index][t] = NULL;
+            token = args[index][t] = NULL;
         }
         if (*eout_to_file == true && *efile == NULL) {
             *efile = (int*)calloc(1, sizeof(int));
@@ -106,10 +127,10 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
             }
             o_append = false;
             free(args[index][t]);
-            args[index][t] = NULL;
+            token = args[index][t] = NULL;
         }
-        if (*token == '<' || *token == '>' || 
-            (strlen(token) == 2 && token[0] == '2' && token[1] == '>')) {
+        if (token && (token[0] == '<' || token[0] == '>' || 
+            strlen(token) == 2 && token[0] == '2' && token[1] == '>')) {
             *in_to_file = *token == '<';
             *out_to_file = *token == '>';
             i_append = strlen(token) == 2 && token[1] == '<';
@@ -118,17 +139,17 @@ void parse_sub_command(char **args[length], int index, int *out_to_file,
             o_append = o_append | (*eout_to_file && 
                     (strlen(token) == 3 && token[0] == '2' && token[1] == '>' && token[2] == '>'));   
             free(args[index][t]);
-            args[index][t] = NULL;
+            token = args[index][t] = NULL;
         }
-        if (strlen(token) == 4 && strncmp(token, "2>&1", 4) == 0) {
+        if (token && strlen(token) == 4 && strncmp(token, "2>&1", 4) == 0) {
             *out_combine = true;
             free(args[index][t]);
-            args[index][t] = NULL;
+            token = args[index][t] = NULL;
         }
-        if (strlen(token) == 4 && strncmp(token, "1>&2", 4) == 0) {
+        if (token && strlen(token) == 4 && strncmp(token, "1>&2", 4) == 0) {
             *err_combine = true;
             free(args[index][t]);
-            args[index][t] = NULL;
+            token = args[index][t] = NULL;
         }
         t++;
     }
@@ -139,12 +160,17 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
     if (ncommands == index) return;
     int fd[2], status = 0, childpid, file;
     int out_to_file = false, in_to_file = false, eout_to_file = false;
-    int out_combine = false, err_combine = false;
+    int out_combine = false, err_combine = false, back_ground = false, internal_command=false;
     if (pipe(fd) == -1) {
         exit(errno);
     }
     parse_sub_command(args, index, &out_to_file, &in_to_file, &eout_to_file, 
-                      &ifile, &ofile, &efile, &out_combine, &err_combine);
+                      &ifile, &ofile, &efile, &out_combine, 
+                      &err_combine, &back_ground, &internal_command);
+    if (internal_command) {
+        execute_internal(ncommands, args, index);
+        return;
+    }
     pid_t pid = fork();
     switch(pid) {
         case -1:
@@ -152,6 +178,8 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
         case 0:
             if (ifile != NULL) {
                 while((dup2(*ifile, STDIN_FILENO) == -1) && errno == EINTR) {}
+                close(*ifile);
+                ifile = NULL;
             }
             if (pfd != NULL) {
                 if (ifile == NULL) {
@@ -162,11 +190,15 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
             }
             if (efile != NULL) {
                 while((dup2(*efile, STDERR_FILENO) == -1) && errno == EINTR) {}
+                close(*efile);
+                efile = NULL;
             } if (index + 1 != ncommands) {
                 while((dup2(fd[1], STDERR_FILENO) == -1) && errno == EINTR) {}
             }
             if (ofile != NULL) {
                 while((dup2(*ofile, STDOUT_FILENO) == -1) && errno == EINTR) {}
+                close(*ofile);
+                ofile = NULL;
             } if (index + 1 != ncommands) {
                 while((dup2(fd[1], STDOUT_FILENO) == -1) && errno == EINTR) {}
             }
@@ -187,7 +219,11 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
                 close(pfd[0]);
                 close(pfd[1]);
             }
-            childpid = waitpid(pid, &status, 0);
+            if (back_ground == true) {
+                childpid = waitpid(pid, &status, WNOHANG);
+            } else {
+                childpid = waitpid(pid, &status, 0);
+            }
             if (ifile) {
                 close(*ifile);
                 free(ifile);
@@ -198,15 +234,34 @@ void execute(int ncommands, char **args[length], int index, int *pfd,
                 free(ofile);
                 ofile = NULL;
             }
+            if (efile) {
+                close(*efile);
+                free(efile);
+                efile = NULL;
+            }
             execute(ncommands, args, index+1, fd, ofile, ifile, efile);
             close(fd[0]);
             close(fd[1]);
     }
 }
 
+void free_args(char **args[length], int ncommands) {
+    int index = 0, jdx = 0;
+    //printf("freeing %d\n", ncommands);
+    for (index = 0; index < ncommands; index++) {
+        for(jdx = 0; args[index][jdx] != NULL; jdx++) {
+            free(args[index][jdx]);
+            args[index][jdx] = NULL;
+        }
+        free(args[index]);
+        args[index] = NULL;
+    }
+}
+
 int main(void)
 {
-    signal(SIGINT, handler);
+    signal(SIGINT, ctrl_c_handler);
+    signal(SIGTERM, term_handler);
     /* 
      * e.g: ls -l | less
      * args[0][0] = ls
@@ -217,6 +272,7 @@ int main(void)
      * args[1][1] = NULL
      */
     char **args[length];
+    parent_pid = getpid();
     while (should_run) {
         int ncommands = 0;
         char strs[MAX_LINE] = {0};
@@ -224,6 +280,7 @@ int main(void)
         printf("osh#");
         fgets(strs, length, stdin);
         if (strs[0] == '\n') continue;
+        if (strncmp(strs, "exit\n", 5)==0) break;
         if (strlen(strs) == 3 && 
             strs[0] == '!' && strs[1] == '!' && strs[2] == '\n') {
             char *t = getHistory();
@@ -238,6 +295,7 @@ int main(void)
         addHistory(strs);
         string_parse(strs, &ncommands, args);
         execute(ncommands, args, 0, NULL, NULL, NULL, NULL);
+        free_args(args, ncommands);
     }
     return 0;
 }
