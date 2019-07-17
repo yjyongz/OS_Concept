@@ -10,10 +10,14 @@
 
 int proc_init(void) {
     struct task_struct *task;
+    unsigned long long used_jiffies= 0;
 
     printk(KERN_INFO "F\tS\tUID\tPID\tPPID\tC\tPRI\tNI\tADDR\tSZ\tWCHAN\tTTY\tTIME\tCMD\n");
     for_each_process(task) {
-        printk(KERN_INFO "%d\t%d\n", task->flag, task->state);
+        printk(KERN_INFO "%d\t%d\t%d\t%d\t\%d\t", 
+               task->flags, task->state, task->cred->uid, 
+               task->pid, task->parent->pid);
+        used_jiffies += task->
     }
     return 0;
 }
