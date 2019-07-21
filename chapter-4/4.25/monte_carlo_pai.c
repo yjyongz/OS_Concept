@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 
 void worker_thread(void);
 long TOTAL_POINTS = 1000 * 1000 * 1000;
 long npoints = 0;
+long totalpoints = 0;
 double random_0_1() {
     return random() / ((double)(RAND_MAX) + 1);
 }
@@ -16,13 +18,13 @@ int main() {
     for (int index = 0; index < 5; index++) {
         printf("%f\n", random_0_1());
     }
-    #pragma omp parrallel num_threads(8) shared(npoints)
+    #pragma omp parrallel num_threads(8) shared(npoints) shared(totalpoints)
     {
         worker_thread();
     }
 
-    printf("npoints: %ld TOTAL_POINTS: %ld\n", npoints, TOTAL_POINTS);
-    printf("PAI: %.012lf\n", (double)((double)(4 * npoints) / (double)TOTAL_POINTS));
+    printf("npoints: %ld TOTAL_POINTS: %ld\n", npoints, totalpoints);
+    printf("PAI: %.012lf\n", (double)((double)(4 * npoints) / (double)totalpoints));
     return 0;
 }
 
@@ -34,6 +36,7 @@ void worker_thread(void) {
         if (x*x + y*y <= 1) {
             npoints++;
         }
+        totalpoints++;
     }
     return;
 }
