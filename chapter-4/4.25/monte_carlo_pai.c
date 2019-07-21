@@ -18,7 +18,7 @@ int main() {
     for (int index = 0; index < 5; index++) {
         printf("%f\n", random_0_1());
     }
-    #pragma omp parrallel num_threads(8) shared(npoints) shared(totalpoints)
+    #pragma omp parrallel num_threads(8) shared(npoints,totalpoints)
     {
         worker_thread();
     }
