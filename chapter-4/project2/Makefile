@@ -1,4 +1,4 @@
 all:
-	gcc -o multithread_sort multithread_sort.c
+	gcc -o multithread_sort multithread_sort.c -g3
 clean:
-	rm multithread
+	rm multithread_sort

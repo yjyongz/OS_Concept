@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <pthread.h>
+#include <stdlib.h>
 
 
 struct range {
@@ -10,24 +11,30 @@ struct range {
 int array[10] = {7,12,19,3,18,4,2,6,15,8};
 
 void merge(int start, int mid, int end) {
-    int index = 0;
+    int index = start;
     int s1,s2;
     s1 = start;
     s2 = mid + 1;
-    while (s1 != mid + 1 && s2 + 1 != end) {
+    int *tarr = (int*)calloc(1, sizeof(int) * ((end - start) + 1));
+    while (s1 <= mid && s2 <= end) {
         if (array[s1] <= array[s2]) {
-            array[index++] = array[s1++];
+            tarr[index++] = array[s1++];
         } else {
-            array[index++] = array[s2++];
+            tarr[index++] = array[s2++];
         }
     }
 
-    while (s1 != mid + 1) {
-        array[index++] = array[s1++];
+    while (s1 <= mid) {
+        tarr[index++] = array[s1++];
     }
-    while (s2 + 1 != end) {
-        array[index++] = array[s1++];
+    while (s2 <= end) {
+        tarr[index++] = array[s2++];
     }
+
+    for (int idx = start; idx <= end; idx++) {
+        array[idx] = tarr[idx];
+    }
+    free(tarr);
 }
 
 void mergeSort(int start, int end) {
@@ -50,15 +57,20 @@ int main() {
     pthread_t second;
     struct range rg;
     rg.start = 0;
-    rg.end = 5;
+    rg.end = 4;
+    for (int idx = 0; idx < 10; idx++) {
+        printf("%d ", array[idx]);
+    }
+    printf("\n");
     pthread_create(&first, NULL, start_section, &rg);
     struct range rg1;
-    rg.start = 6;
-    rg.end = 10;
-    pthread_create(&second, NULL, start_section, &rg);
+    rg1.start = 5;
+    rg1.end = 9;
+    pthread_create(&second, NULL, start_section, &rg1);
 
     pthread_join(first, NULL);
     pthread_join(second, NULL);
+    merge(0, 4, 9);
 
     for (int idx = 0; idx < 10; idx++) {
         printf("%d ", array[idx]);
